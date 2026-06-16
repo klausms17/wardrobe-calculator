@@ -843,6 +843,35 @@ input[type=range]::-moz-range-thumb{
   border-top:0.5px solid var(--line);
   padding-top:16px;
 }
+.mat-totals{ display:flex; flex-direction:column; gap:6px; margin-top:6px }
+.mat-total-row{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:8px 12px; background:var(--surface-2); border-radius:8px;
+  font-size:13px; color:var(--text);
+}
+.mat-total-row b{ font-variant-numeric:tabular-nums; font-weight:600 }
+.spec-details > summary{
+  cursor:pointer; user-select:none; list-style:none;
+  font-size:12px; font-weight:500; color:var(--text-2);
+  padding:8px 0; letter-spacing:0.02em;
+  display:flex; align-items:center; gap:6px;
+}
+.spec-details > summary::-webkit-details-marker{ display:none }
+.spec-details > summary::before{
+  content:''; width:5px; height:5px;
+  border-right:1.5px solid var(--text-2); border-bottom:1.5px solid var(--text-2);
+  transform:rotate(-45deg); transition:transform var(--t-fast);
+}
+.spec-details[open] > summary::before{ transform:rotate(45deg) }
+.spec-table{ font-size:11.5px; margin-top:4px }
+.spec-row{
+  display:grid; grid-template-columns:1.6fr 1.2fr 0.9fr 0.4fr; gap:6px;
+  padding:5px 8px; border-bottom:0.5px solid var(--line);
+  color:var(--text); align-items:center;
+}
+.spec-row.spec-head{ font-weight:600; color:var(--text-2); text-transform:uppercase; font-size:10px; letter-spacing:0.04em }
+.spec-row span:last-child{ text-align:center; font-variant-numeric:tabular-nums }
+.spec-row span:nth-child(3){ font-variant-numeric:tabular-nums; color:var(--text-2) }
 .extra-block-title{
   font-size:12px; font-weight:500;
   color:var(--text-2); letter-spacing:0.1em;
@@ -1550,6 +1579,10 @@ function initThree(){
   renderer.toneMappingExposure = 1.15;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // Свет статичен — тени не нужно пересчитывать каждый кадр. Обновляем вручную
+  // после перестроения шкафа (needsShadowUpdate), а при вращении камеры тени не трогаются.
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
 
   pmremGenerator = new THREE.PMREMGenerator(renderer);
   pmremGenerator.compileEquirectangularShader();
@@ -1565,7 +1598,7 @@ function initThree(){
   controls.enableZoom = false;       // используем кастомный wheel handler (smooth)
   controls.rotateSpeed = 0.7;
   controls.target.set(0, 1.1, -1);
-  controls.addEventListener('change', () => { dimsDirty = true; needsRender = true; });
+  controls.addEventListener('change', () => { dimsDirty = true; needsRender = true; _lastControlsChange = performance.now(); });
 
   // === POSTPROCESSING: EffectComposer + OutlinePass для тонких линий по силуэтам объектов ===
   const cw = canvas.clientWidth, ch = canvas.clientHeight;
@@ -1678,17 +1711,25 @@ function initThree(){
 
   canvas.addEventListener('wheel', onWheel, { passive: false });
 
-  // === Динамическое разрешение: при вращении/панораме снижаем DPR до 1 —
-  // вращение становится заметно плавнее; при отпускании возвращаем чёткость.
+  // === Динамическое разрешение + лёгкий режим во время вращения ===
+  // При вращении/панораме: DPR→1, OutlinePass ОТКЛЮЧАЕМ (самый тяжёлый проход),
+  // размерные линии прячем. При отпускании — возвращаем чёткость и контуры.
   const _fullDPR = Math.min(window.devicePixelRatio, IS_TOUCH ? 1.5 : 2);
   let _droppedDPR = false;
   function dropResolution(){
-    if (_droppedDPR || _fullDPR <= 1.01) return;
+    _interacting = true;
+    if (_droppedDPR) return;
     _droppedDPR = true;
     renderer.setPixelRatio(1);
     if (composer){
       if (composer.setPixelRatio) composer.setPixelRatio(1);
       composer.setSize(canvas.clientWidth, canvas.clientHeight);
+    }
+    // Прячем размерные линии на время вращения — их перерисовка DOM дорогая
+    const dimSvg = document.getElementById('dim-svg');
+    if (dimSvg && !dimSvg.classList.contains('hidden')){
+      dimSvg.style.visibility = 'hidden';
+      _dimsHiddenByInteraction = true;
     }
     needsRender = true;
   }
@@ -1700,6 +1741,16 @@ function initThree(){
       if (composer.setPixelRatio) composer.setPixelRatio(_fullDPR);
       composer.setSize(canvas.clientWidth, canvas.clientHeight);
     }
+    // Возвращаем размеры и пересчитываем один раз
+    if (_dimsHiddenByInteraction){
+      const dimSvg = document.getElementById('dim-svg');
+      if (dimSvg) dimSvg.style.visibility = '';
+      _dimsHiddenByInteraction = false;
+      dimsDirty = true;
+    }
+    // НЕ снимаем _interacting сразу: damping (инерция) ещё двигает камеру ~0.5с.
+    // Лёгкий режим выключится в animate(), когда движение затихнет — тогда вернётся OutlinePass.
+    _settleOutline = true;
     needsRender = true;
   }
   canvas.addEventListener('pointerdown', dropResolution);
@@ -3032,6 +3083,8 @@ function buildWardrobe(){
   }
   wardrobe.position.set(0, 0, -2.5 + D/2 + 0.015);
   scene.add(wardrobe);
+  // Шкаф перестроен — пересчитать тени один раз (autoUpdate выключен для производительности)
+  if (renderer && renderer.shadowMap) renderer.shadowMap.needsUpdate = true;
 
   if (fitNeeded){
     autoFitCamera(W, H, D, shape);
@@ -3206,6 +3259,10 @@ function applyViewMode(){
 let needsRender = true;
 let _lastRenderAt = 0;
 let _dimsLastUpdate = 0;
+let _interacting = false;            // идёт вращение/панорама — лёгкий режим
+let _dimsHiddenByInteraction = false;
+let _settleOutline = false;          // ждём затихания инерции, чтобы вернуть OutlinePass
+let _lastControlsChange = 0;
 function requestRender(){ needsRender = true; }
 
 function animate(){
@@ -3271,11 +3328,22 @@ function animate(){
   controls.update();
 
   const now = performance.now();
+
+  // Инерция затихла после отпускания → выходим из лёгкого режима, возвращаем OutlinePass
+  if (_settleOutline && now - _lastControlsChange > 120){
+    _settleOutline = false;
+    _interacting = false;
+    needsRender = true;   // один кадр с контурами
+    dimsDirty = true;
+  }
+
   // Heartbeat-страховка: даже в покое рисуем кадр раз в 500мс (на случай пропущенного invalidate)
   const heartbeat = now - _lastRenderAt > 500;
 
   if (needsRender || animating || dimsDirty || heartbeat){
-    if (composer) composer.render();
+    // Во время вращения/панорамы рисуем БЕЗ OutlinePass — это снимает 3 тяжёлых прохода
+    // и делает вращение плавным. Контуры возвращаются сразу после отпускания.
+    if (composer && !_interacting) composer.render();
     else renderer.render(scene, camera);
     _lastRenderAt = now;
     needsRender = false;
@@ -3296,8 +3364,9 @@ function animate(){
     }
   }
 
-  // Размерные линии: SVG-DOM дорогой, обновляем не чаще раза в 45мс (≈22fps достаточно для подписей)
-  if (dimsDirty && now - _dimsLastUpdate > 45){
+  // Размерные линии: SVG-DOM дорогой. Во время вращения НЕ трогаем (они спрятаны),
+  // пересчитываем один раз после отпускания.
+  if (dimsDirty && !_interacting && now - _dimsLastUpdate > 45){
     updateDimensionLines();
     dimsDirty = false;
     _dimsLastUpdate = now;
@@ -4106,6 +4175,190 @@ function calcPrice(){
 }
 
 function fmt(n){ return n.toLocaleString('ru-RU').replace(/,/g,'\u00A0') + ' ₽' }
+
+// Выгрузка спецификации деталей в Excel (SheetJS, клиентская генерация)
+let _xlsxLib = null;
+async function loadXLSX(){
+  if (_xlsxLib) return _xlsxLib;
+  const mod = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+  _xlsxLib = mod.default || mod;
+  return _xlsxLib;
+}
+async function exportSpecToExcel(){
+  const btn = document.getElementById('export-spec');
+  try {
+    if (btn){ btn.disabled = true; btn.style.opacity = '0.6'; }
+    const XLSX = await loadXLSX();
+    const cut = computeCutList();
+    const sh = SHAPES[state.shape];
+
+    // Лист 1 — Детали
+    const head = ['№', 'Деталь', 'Материал', 'Толщина, мм', 'Ширина, мм', 'Высота, мм', 'Кол-во', 'Площадь, м²'];
+    const rows = cut.parts.map((p, i) => [i+1, p.name, p.material, p.thick, p.w, p.h, p.qty, p.areaM2]);
+    // Итоги по материалам
+    rows.push([]);
+    rows.push(['', 'ИТОГО ПО МАТЕРИАЛАМ', '', '', '', '', '', '']);
+    for (const [k,v] of Object.entries(cut.totals)) rows.push(['', k, '', '', '', '', '', +v.toFixed(2)]);
+    const totalArea = Object.values(cut.totals).reduce((a,b)=>a+b,0);
+    rows.push(['', 'Всего площади', '', '', '', '', '', +totalArea.toFixed(2)]);
+
+    const aoa = [
+      ['СПЕЦИФИКАЦИЯ ДЕТАЛЕЙ — ARSI-HOME'],
+      [`Шкаф: ${sh.name}${sh.hasWing ? ' ('+sh.sub+')' : ''}, ${state.width}×${state.height}×${state.depth} мм`],
+      [`Корпус: ${CONFIG.materials[state.bodyMaterial].name} · Фасады: ${CONFIG.materials[state.facadeMaterial].name}`],
+      [`Дата: ${new Date().toLocaleDateString('ru-RU')}`],
+      [],
+      head,
+      ...rows
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{wch:5},{wch:36},{wch:20},{wch:12},{wch:12},{wch:11},{wch:8},{wch:12}];
+    ws['!merges'] = [
+      {s:{r:0,c:0},e:{r:0,c:7}},
+      {s:{r:1,c:0},e:{r:1,c:7}},
+      {s:{r:2,c:0},e:{r:2,c:7}},
+      {s:{r:3,c:0},e:{r:3,c:7}}
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Детали');
+
+    const fname = `Спецификация_ARSI_${state.width}x${state.height}x${state.depth}.xlsx`;
+    XLSX.writeFile(wb, fname);
+  } catch(e){
+    alert('Не удалось сформировать Excel: ' + (e && e.message ? e.message : e) + '\nПроверьте подключение к интернету.');
+  } finally {
+    if (btn){ btn.disabled = false; btn.style.opacity = '1'; }
+  }
+}
+
+// === ДЕТАЛИРОВКА (расчёт материала) ===
+// Перечисляет все детали шкафа по материалам и толщинам с размерами и количеством.
+// Возвращает { parts:[{name, material, thick, w, h, qty, areaM2}], totals:{ '<материал> <толщина>': м² } }
+function computeCutList(){
+  const T = 16;                       // толщина плиты корпуса, мм
+  const FT = 18;                      // толщина фасада, мм
+  const BT = 3;                       // толщина задней стенки (ХДФ), мм
+  const W = state.width, H = state.height, D = state.depth;
+  const socket = state.socket || 0;
+  const antH = state.antresol ? state.antresolH : 0;
+  const bodyH = H - socket;
+  const innerW = W - 2*T;
+  const gridH = bodyH - 2*T - antH;
+  const cols = state.cols, rows = state.rows;
+  const cellW = innerW / cols;
+  const cellH = gridH / rows;
+
+  const bodyMatName = (CONFIG.materials[state.bodyMaterial] || CONFIG.materials.ldsp).name;
+  const facadeMatName = (CONFIG.materials[state.facadeMaterial] || CONFIG.materials.ldsp).name;
+
+  const parts = [];
+  const add = (name, material, thick, w, h, qty) => {
+    if (qty <= 0 || w <= 0 || h <= 0) return;
+    parts.push({ name, material, thick, w: Math.round(w), h: Math.round(h), qty,
+      areaM2: +((w/1000) * (h/1000) * qty).toFixed(3) });
+  };
+
+  // --- Корпус (ЛДСП/МДФ корпуса, 16мм) ---
+  add('Боковая стенка', bodyMatName, T, D, bodyH, 2);
+  add('Крыша', bodyMatName, T, innerW, D, 1);
+  add('Дно', bodyMatName, T, innerW, D, 1);
+  if (cols > 1) add('Стойка вертикальная', bodyMatName, T, D - T, gridH, cols - 1);
+  if (rows > 1) add('Полка горизонтальная (между секциями)', bodyMatName, T, cellW - T, D - T, (rows - 1) * cols);
+  if (antH > 0){
+    add('Полка антресоли', bodyMatName, T, innerW, D, 1);
+    if (cols > 1) add('Стойка антресоли', bodyMatName, T, D - T, antH, cols - 1);
+  }
+  if (socket > 0){
+    add('Цоколь передний/задний', bodyMatName, T, W, socket, 2);
+    add('Цоколь боковой', bodyMatName, T, D - 2*T, socket, 2);
+  }
+
+  // --- Наполнение (полки внутри секций) ---
+  let innerShelves = 0;
+  const countShelvesFor = (filling, hMm) => {
+    if (filling === 'shelves') return hMm > 900 ? 3 : 2;
+    if (filling === 'rod') return 0;
+    return 0;
+  };
+  for (const cell of state.cells){
+    if (cell.type === 'open' || cell.type === 'drawer') {}
+    if (cell.filling === 'custom' && Array.isArray(cell.stack)){
+      const zones = computeStackZones(cell.stack, Math.round(cellH));
+      innerShelves += Math.max(0, zones.length - 1); // полки-разделители между зонами
+      for (const z of zones){
+        const zh = z.topMm - z.bottomMm;
+        innerShelves += countShelvesFor(z.f, zh);
+      }
+    } else {
+      innerShelves += countShelvesFor(cell.filling, Math.round(cellH));
+    }
+  }
+  if (innerShelves > 0) add('Полка съёмная (наполнение)', bodyMatName, T, cellW - 4, D - 40, innerShelves);
+
+  // --- Фасады (двери/ящики, 18мм) ---
+  let doorCount = 0, drawerFronts = 0;
+  const facW = cellW - 4;  // фасад чуть уже проёма (зазоры)
+  for (const cell of state.cells){
+    if (cell.type === 'open') continue;
+    if (cell.type === 'drawer'){ drawerFronts++; continue; }
+    if (cell.filling === 'custom' && Array.isArray(cell.stack) && cell.stack.some(z => z.f === 'drawer_box')){
+      // сегментированный фасад: дверные участки + ящики
+      const zones = computeStackZones(cell.stack, Math.round(cellH));
+      let run = 0;
+      const flush = () => { if (run > 0){ add('Фасад-дверь', facadeMatName, FT, facW, run - 4, 1); doorCount++; run = 0; } };
+      for (const z of zones){
+        if (z.f === 'drawer_box'){ flush(); add('Фасад-ящик', facadeMatName, FT, facW, (z.topMm - z.bottomMm) - 4, 1); drawerFronts++; }
+        else run += z.topMm - z.bottomMm;
+      }
+      flush();
+    } else {
+      add('Фасад-дверь', facadeMatName, FT, facW, cellH - 4, 1);
+      doorCount++;
+    }
+  }
+  // Антресольные двери — по колонне
+  if (antH > 0){
+    add('Фасад антресоли', facadeMatName, FT, facW, antH - 4, cols);
+  }
+
+  // --- Крылья (для углового/П-образного) ---
+  if (SHAPES[state.shape].hasWing){
+    const nWings = (SHAPES[state.shape].wingSides || [SHAPES[state.shape].wingSide]).length;
+    const wingLen = state.wingLength;
+    const wRows = state.wingRows || 1;
+    const wSecH = gridH / wRows;
+    const wingInnerW = D - 2*T;
+    // Корпус крыла
+    add('Крыло: стенка передняя', bodyMatName, T, D, bodyH, nWings);
+    add('Крыло: стенка торцевая', bodyMatName, T, wingLen, bodyH, nWings);
+    add('Крыло: крыша', bodyMatName, T, D, wingLen, nWings);
+    add('Крыло: дно', bodyMatName, T, D, wingLen, nWings);
+    if (wRows > 1) add('Крыло: полка', bodyMatName, T, wingInnerW, wingLen - T, (wRows - 1) * nWings);
+    // Фасады крыла
+    add('Крыло: фасад-дверь', facadeMatName, FT, wingInnerW - 4, wSecH - 4, wRows * nWings);
+  }
+
+  // --- Задняя стенка (ХДФ) ---
+  if (state.backWall && state.backWall !== 'none'){
+    const backName = (CONFIG.backWalls[state.backWall] || {}).name || 'Задняя стенка';
+    const isBody = state.backWall === 'body';
+    add('Задняя стенка', isBody ? bodyMatName : backName, isBody ? T : BT, innerW, bodyH - T, 1);
+    if (SHAPES[state.shape].hasWing){
+      const nWings = (SHAPES[state.shape].wingSides || [SHAPES[state.shape].wingSide]).length;
+      add('Задняя стенка крыла', isBody ? bodyMatName : backName, isBody ? T : BT, D - 2*T, bodyH - T, nWings);
+    }
+  }
+
+  // --- Итоги по материалам и толщине ---
+  const totals = {};
+  for (const p of parts){
+    // Имя материала без дублирования толщины (у ЛДСП имя уже содержит «16 мм»)
+    const matBase = p.material.replace(/\s*\d+\s*мм/i, '').trim();
+    const key = `${matBase} ${p.thick} мм`;
+    totals[key] = +((totals[key] || 0) + p.areaM2).toFixed(3);
+  }
+  return { parts, totals };
+}
 function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])) }
 
 function formatPhone(raw){
@@ -4753,6 +5006,35 @@ function renderStepBody(){
       ${p.extras>0?`<div class="summary-row"><span>Доп. опции</span><span>${fmt(p.extras)}</span></div>`:''}
       <div class="summary-row total"><span>Итого</span><span>${fmt(p.total)}</span></div>
     </div>`);
+
+    // === ДЕТАЛИРОВКА МАТЕРИАЛА ===
+    {
+      const cut = computeCutList();
+      const totalEntries = Object.entries(cut.totals);
+      html.push(`<div class="section-label" style="margin-top:22px">Расход материала</div>`);
+      html.push(`<div class="mat-totals">
+        ${totalEntries.map(([k,v]) => `
+          <div class="mat-total-row"><span>${k}</span><span><b>${v.toFixed(2)}</b> м²</span></div>
+        `).join('')}
+      </div>`);
+      html.push(`<details class="spec-details" style="margin-top:10px">
+        <summary>Список деталей (${cut.parts.length})</summary>
+        <div class="spec-table">
+          <div class="spec-row spec-head"><span>Деталь</span><span>Материал</span><span>Размер, мм</span><span>Кол</span></div>
+          ${cut.parts.map(pt => `
+            <div class="spec-row">
+              <span>${pt.name}</span>
+              <span>${pt.material} ${pt.thick}мм</span>
+              <span>${pt.w}×${pt.h}</span>
+              <span>${pt.qty}</span>
+            </div>`).join('')}
+        </div>
+      </details>`);
+      html.push(`<button class="bulk-btn" id="export-spec" style="width:100%; margin-top:10px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:14px;height:14px;vertical-align:middle;margin-right:6px"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        Скачать спецификацию (Excel)
+      </button>`);
+    }
     html.push(`<div class="field"><input type="text" class="form-input" id="cust-name" placeholder="Ваше имя" value="${escapeHtml(state.customer.name)}"></div>`);
     html.push(`<div class="field"><input type="tel" class="form-input" id="cust-phone" placeholder="+7 ___ ___ __ __" value="${escapeHtml(state.customer.phone)}"></div>`);
     html.push(`<div class="field">
@@ -4972,6 +5254,12 @@ function attachStepHandlers(){
   const nameEl = document.getElementById('cust-name');
   const phoneEl = document.getElementById('cust-phone');
   const commentEl = document.getElementById('cust-comment');
+
+  // Кнопка «Скачать спецификацию (Excel)»
+  const exportSpecBtn = document.getElementById('export-spec');
+  if (exportSpecBtn){
+    exportSpecBtn.addEventListener('click', () => exportSpecToExcel());
+  }
   if (nameEl) nameEl.addEventListener('input', e => { state.customer.name = e.target.value; saveStateToStorage(); });
   if (phoneEl) phoneEl.addEventListener('input', e => {
     const cursorPos = e.target.selectionStart;
@@ -5028,7 +5316,7 @@ function submitOrder(){
   const hasWing = SHAPES[state.shape].hasWing;
   const payload = {
     timestamp: new Date().toISOString(),
-    source: 'wardrobe-configurator-v60',
+    source: 'wardrobe-configurator-v62',
     customer: state.customer,
     config: {
       shape: SHAPES[state.shape].name + (hasWing ? ' (' + SHAPES[state.shape].sub + ')' : ''),
