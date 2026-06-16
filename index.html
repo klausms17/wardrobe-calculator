@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Конструктор распашного шкафа — arsi-home</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -55,13 +58,29 @@ body{
 }
 /* Развёрнутая панель настроек на мобильном (шторка вверх) */
 .app.panel-expanded{ grid-template-rows:25fr 75fr; }
-@media (min-width: 900px){ .app{ grid-template-columns: 1fr 480px; grid-template-rows: 1fr; } }
-@media (min-width: 1320px){ .app{ grid-template-columns: 1fr 540px; } }
+@media (min-width: 900px){
+  .app{
+    grid-template-columns: 1fr 480px;
+    grid-template-rows: 1fr;
+    gap:18px;
+    padding:18px;
+    background:var(--bg);
+  }
+}
+@media (min-width: 1320px){ .app{ grid-template-columns: 1fr 540px; gap:22px; padding:22px; } }
 
 .viewport{
   position:relative;
   background:linear-gradient(180deg, #EFEAE0 0%, #E2DBCC 100%);
   overflow:hidden;
+}
+/* На десктопе 3D — карточка со скруглением и тенью, «плавает» в фоне (как референс) */
+@media (min-width: 900px){
+  .viewport{
+    border-radius:20px;
+    box-shadow:var(--shadow-lg);
+    border:0.5px solid var(--line);
+  }
 }
 #three-canvas{
   display:block;
@@ -222,7 +241,103 @@ body{
   border-top:0.5px solid var(--line);
   position:relative;
 }
-@media (min-width:900px){ .wizard{ border-top:none; border-left:0.5px solid var(--line) } }
+@media (min-width:900px){
+  .wizard{
+    border-top:none;
+    border:0.5px solid var(--line);
+    border-radius:20px;
+    box-shadow:var(--shadow-lg);
+  }
+}
+
+/* === МОДАЛ НАСТРОЙКИ ЯЧЕЙКИ (как у конкурента) === */
+.cell-modal-overlay{
+  position:fixed; inset:0; z-index:50;
+  background:rgba(26,24,22,0.32);
+  backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  display:none; align-items:center; justify-content:center;
+  padding:20px;
+  opacity:0; transition:opacity 0.2s ease;
+}
+.cell-modal-overlay.show{ display:flex; opacity:1 }
+.cell-modal{
+  background:var(--surface);
+  border-radius:22px;
+  box-shadow:0 24px 70px -12px rgba(26,24,22,0.4), 0 8px 24px -8px rgba(26,24,22,0.2);
+  width:100%; max-width:460px;
+  max-height:88vh; overflow-y:auto;
+  padding:26px 28px 28px;
+  transform:translateY(8px) scale(0.98);
+  transition:transform 0.22s cubic-bezier(0.2,0.8,0.2,1);
+}
+.cell-modal-overlay.show .cell-modal{ transform:translateY(0) scale(1) }
+.cell-modal-head{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:20px;
+}
+.cell-modal-title{
+  font-family:'Fraunces',serif; font-weight:400; font-size:25px;
+  color:var(--text); letter-spacing:-0.01em; margin:0;
+}
+.cell-modal-close{
+  width:38px; height:38px; flex-shrink:0;
+  border:0.5px solid var(--line); border-radius:50%;
+  background:var(--surface); color:var(--text-2); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:all var(--t-fast);
+}
+.cell-modal-close:hover{ background:var(--surface-2); color:var(--text); border-color:var(--line-2) }
+.cell-modal-close svg{ width:18px; height:18px; stroke-width:1.6 }
+.cell-modal-body{ display:flex; flex-direction:column; gap:18px }
+/* Ряд типов-иконок */
+.cm-type-row{ display:flex; gap:8px; flex-wrap:nowrap }
+.cm-type{
+  flex:1; min-width:0; aspect-ratio:1;
+  border:1.5px solid var(--line); border-radius:12px;
+  background:var(--surface-2); cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  padding:6px 3px; transition:all var(--t-fast);
+}
+.cm-type:hover{ border-color:var(--line-2) }
+.cm-type.on{ border-color:var(--accent-warm); background:#fff; box-shadow:0 2px 10px -2px rgba(255,139,66,0.3) }
+.cm-type svg{ width:26px; height:26px; stroke-width:1.3; color:var(--text-2) }
+.cm-type.on svg{ color:var(--text) }
+.cm-type-label{ font-size:8.5px; color:var(--text-3); text-align:center; line-height:1.1; font-weight:500 }
+.cm-type.on .cm-type-label{ color:var(--text-2) }
+/* Выпадающий список наполнения */
+.cm-field-label{ font-size:12px; font-weight:600; color:var(--text-2); letter-spacing:0.04em; text-transform:uppercase; margin-bottom:8px }
+.cm-select{
+  width:100%; font:inherit; font-size:15px; font-weight:500;
+  padding:14px 16px; padding-right:42px;
+  border:1.5px solid var(--line); border-radius:12px;
+  background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%235E5953' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center;
+  color:var(--text); cursor:pointer; -webkit-appearance:none; appearance:none;
+  transition:border-color var(--t-fast);
+}
+.cm-select:focus{ outline:none; border-color:var(--accent-warm) }
+/* Размер ячейки */
+.cm-size-row{ display:flex; align-items:flex-end; gap:14px }
+.cm-size-field{ flex:1 }
+.cm-size-x{ font-size:15px; color:var(--text-3); padding-bottom:14px; font-weight:500 }
+.cm-size-input{
+  width:100%; font:inherit; font-size:15px; font-weight:600; text-align:center;
+  font-variant-numeric:tabular-nums;
+  padding:13px 10px; border:1.5px solid var(--line); border-radius:12px;
+  background:var(--surface); color:var(--text); -moz-appearance:textfield;
+}
+.cm-size-input:focus{ outline:none; border-color:var(--accent-warm) }
+.cm-size-input:disabled{ background:var(--surface-2); color:var(--text-3); cursor:not-allowed }
+.cm-size-input::-webkit-outer-spin-button,.cm-size-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0 }
+.cm-size-hint{ font-size:11px; color:var(--text-3); margin-top:6px }
+/* Кнопка Готово */
+.cm-save{
+  width:100%; font:inherit; font-size:16px; font-weight:600;
+  padding:16px; border:none; border-radius:14px;
+  background:var(--accent); color:#fff; cursor:pointer;
+  transition:all var(--t-fast); margin-top:4px;
+}
+.cm-save:hover{ background:var(--accent-soft); transform:translateY(-1px) }
+/* Сторона/цвет внутри модала используют существующие .popover-side/.swatch-grid */
 
 /* Грип-кнопка шторки — только на мобильном */
 .panel-grip{
@@ -1030,6 +1145,19 @@ input[type=range]::-moz-range-thumb{
   </div>
 </div>
 
+<!-- Модал настройки ячейки (как у конкурента: выбрал тип → тут же настроил) -->
+<div class="cell-modal-overlay" id="cell-modal-overlay">
+  <div class="cell-modal" id="cell-modal" role="dialog" aria-modal="true">
+    <div class="cell-modal-head">
+      <h2 class="cell-modal-title" id="cell-modal-title">Настройки ячейки</h2>
+      <button class="cell-modal-close" id="cell-modal-close" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="cell-modal-body" id="cell-modal-body"></div>
+  </div>
+</div>
+
 <script>
 // Грип-шторка панели настроек (мобильный) — обычный script, работает даже если CDN three.js недоступен
 document.addEventListener('DOMContentLoaded', function(){
@@ -1055,10 +1183,8 @@ document.addEventListener('DOMContentLoaded', function(){
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+// Постобработка (контуры дверей) грузится ЛЕНИВО после первого кадра — чтобы сцена
+// появлялась максимально быстро, а контуры подключались следом.
 
 const CONFIG = {
   basePerM2: 8500,
@@ -1600,19 +1726,11 @@ function initThree(){
   controls.target.set(0, 1.1, -1);
   controls.addEventListener('change', () => { dimsDirty = true; needsRender = true; _lastControlsChange = performance.now(); });
 
-  // === POSTPROCESSING: EffectComposer + OutlinePass для тонких линий по силуэтам объектов ===
-  const cw = canvas.clientWidth, ch = canvas.clientHeight;
-  composer = new EffectComposer(renderer);
-  composer.addPass(new RenderPass(scene, camera));
-  outlinePass = new OutlinePass(new THREE.Vector2(cw, ch), scene, camera);
-  outlinePass.edgeStrength = 8.0;
-  outlinePass.edgeThickness = 2.0;
-  outlinePass.edgeGlow = 0.0;
-  outlinePass.pulsePeriod = 0;
-  outlinePass.visibleEdgeColor.set('#000000');
-  outlinePass.hiddenEdgeColor.set('#000000');
-  composer.addPass(outlinePass);
-  composer.addPass(new OutputPass());
+  // === POSTPROCESSING: грузится лениво (см. initPostprocessing) ===
+  // Сначала сцена рисуется простым renderer.render — это даёт быстрый первый кадр.
+  // Контуры дверей подключаются через ~настройку после первого показа.
+  composer = null;
+  schedulePostprocessing();
 
   const hemi = new THREE.HemisphereLight(0xfff4e0, 0xd5c4a4, 0.5);
   scene.add(hemi);
@@ -1694,6 +1812,12 @@ function initThree(){
   animate();
 
   window.addEventListener('resize', onResize);
+  // Карточка 3D может менять размер не только при ресайзе окна (шторка панели, смена раскладки) —
+  // следим за самим контейнером, чтобы рендер всегда точно совпадал с областью
+  if (window.ResizeObserver){
+    const _ro = new ResizeObserver(() => { onResize(); needsRender = true; });
+    _ro.observe(document.querySelector('.viewport'));
+  }
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerleave', () => {
     if (hoveredCell !== -1){
@@ -1753,6 +1877,9 @@ function initThree(){
     _settleOutline = true;
     needsRender = true;
   }
+  // Открываем closures наружу — чтобы зум колесом (onWheel) тоже мог уходить в лёгкий режим
+  _dropResolutionFn = dropResolution;
+  _restoreResolutionFn = restoreResolution;
   canvas.addEventListener('pointerdown', dropResolution);
   window.addEventListener('pointerup', restoreResolution);
   canvas.addEventListener('touchstart', dropResolution, { passive: true });
@@ -1816,6 +1943,57 @@ function onResize(){
   if (outlinePass) outlinePass.setSize(w, h);
 }
 
+// Лениво подгружаем постобработку (контуры дверей) после первого показа сцены.
+// Это убирает ~15 сетевых запросов из критического пути загрузки → сцена появляется быстрее.
+let _ppRequested = false;
+function schedulePostprocessing(){
+  if (_ppRequested) return;
+  _ppRequested = true;
+  const start = async () => {
+    try {
+      const [{ EffectComposer }, { RenderPass }, { OutlinePass }, { OutputPass }] = await Promise.all([
+        import('three/addons/postprocessing/EffectComposer.js'),
+        import('three/addons/postprocessing/RenderPass.js'),
+        import('three/addons/postprocessing/OutlinePass.js'),
+        import('three/addons/postprocessing/OutputPass.js')
+      ]);
+      const canvas = document.getElementById('three-canvas');
+      const cw = canvas.clientWidth, ch = canvas.clientHeight;
+      const comp = new EffectComposer(renderer);
+      comp.addPass(new RenderPass(scene, camera));
+      outlinePass = new OutlinePass(new THREE.Vector2(cw, ch), scene, camera);
+      outlinePass.edgeStrength = 8.0;
+      outlinePass.edgeThickness = 2.0;
+      outlinePass.edgeGlow = 0.0;
+      outlinePass.pulsePeriod = 0;
+      outlinePass.visibleEdgeColor.set('#000000');
+      outlinePass.hiddenEdgeColor.set('#000000');
+      comp.addPass(outlinePass);
+      comp.addPass(new OutputPass());
+      composer = comp;
+      refreshOutlineTargets();
+      needsRender = true;
+    } catch(e){
+      // Если не загрузилось — остаёмся на простом рендере (контуров не будет, но всё работает)
+      composer = null;
+    }
+  };
+  // Запускаем после первого кадра, когда браузер уже показал сцену
+  if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 1200 });
+  else setTimeout(start, 300);
+}
+
+// Назначить outline только на фасады (двери/ящики/крыло)
+function refreshOutlineTargets(){
+  if (!outlinePass || !wardrobeRefs.covers) return;
+  const t = [];
+  for (const c of wardrobeRefs.covers){
+    if (c.userData.isDoorShadow || c.userData.isDrawerHandle) continue;
+    t.push(c);
+  }
+  outlinePass.selectedObjects = t;
+}
+
 function loadFloorBumpRoughness(material){
   // Подгружаем bump+roughness с CDN — даст реальный 3D-рельеф волокон ПОВЕРХ нашего светлого цвета
   // diffuse уже стоит процедурный (светлый дуб), эти карты только добавляют рельеф и матовость
@@ -1865,7 +2043,10 @@ function loadFloorBumpRoughness(material){
 }
 
 function makeOakParquetTexture(){
-  const SIZE = 2048;
+  // 1024² достаточно: пол виден под углом на фоне, при anisotropy 16 деталей хватает,
+  // а объём работы canvas (микрошум, волокна) вчетверо меньше, чем при 2048² — это
+  // ощутимо ускоряет первую загрузку.
+  const SIZE = 1024;
   const c = document.createElement('canvas');
   c.width = SIZE; c.height = SIZE;
   const ctx = c.getContext('2d');
@@ -1876,8 +2057,8 @@ function makeOakParquetTexture(){
     '#CCA56C', '#DAB280', '#BE965D', '#D2A86E', '#C8A065'
   ];
 
-  const plankW = 512;   // 4 доски по горизонтали
-  const plankH = 128;   // 16 рядов
+  const plankW = 256;   // 4 доски по горизонтали
+  const plankH = 64;    // 16 рядов
   const seamDark = 'rgba(60,35,12,0.45)';
   const seamLight = 'rgba(255,235,195,0.22)';
 
@@ -2174,20 +2355,32 @@ function makeWoodTexture(baseHex, isWood){
   } else {
     const num = parseInt(baseHex.slice(1), 16);
     const r = (num>>16)&0xff, g = (num>>8)&0xff, b = num&0xff;
-    for (let y = 0; y < 1024; y += 1){
+    // Пиксели пишем напрямую в типизированный массив ImageData — это в десятки раз
+    // быстрее, чем ~520k вызовов fillRect + аллокаций строк fillStyle, что давало
+    // заметный фриз при первой загрузке и при первом выборе нового цвета дерева.
+    const img = ctx.createImageData(1024, 1024);
+    const data = img.data;
+    for (let y = 0; y < 1024; y++){
       const variation = Math.sin(y * 0.012) * 8 + Math.sin(y * 0.04) * 4;
+      const ySin = Math.sin(y * 0.005) * 30;
+      const yGrain = y * 0.001;
+      const rowOff = y * 1024 * 4;
       for (let x = 0; x < 1024; x += 2){
-        const grain = Math.sin(x * 0.003 + y * 0.001) * 6
-                    + Math.sin(x * 0.008 + Math.sin(y*0.005)*30) * 8
+        const grain = Math.sin(x * 0.003 + yGrain) * 6
+                    + Math.sin(x * 0.008 + ySin) * 8
                     + (Math.random() - 0.5) * 14;
         const total = variation + grain;
-        const rr = Math.max(0, Math.min(255, r + total));
-        const gg = Math.max(0, Math.min(255, g + total * 0.9));
-        const bb = Math.max(0, Math.min(255, b + total * 0.7));
-        ctx.fillStyle = `rgb(${rr|0},${gg|0},${bb|0})`;
-        ctx.fillRect(x, y, 2, 1);
+        const rr = r + total;       const gg = g + total * 0.9;       const bb = b + total * 0.7;
+        const rc = rr < 0 ? 0 : rr > 255 ? 255 : rr;
+        const gc = gg < 0 ? 0 : gg > 255 ? 255 : gg;
+        const bc = bb < 0 ? 0 : bb > 255 ? 255 : bb;
+        let i = rowOff + x * 4;
+        // тот же цвет на пару пикселей (как было fillRect шириной 2)
+        data[i] = rc;   data[i+1] = gc;   data[i+2] = bc;   data[i+3] = 255;
+        data[i+4] = rc; data[i+5] = gc;   data[i+6] = bc;   data[i+7] = 255;
       }
     }
+    ctx.putImageData(img, 0, 0);
     ctx.globalAlpha = 0.18;
     for (let k = 0; k < 12; k++){
       ctx.beginPath();
@@ -2219,20 +2412,48 @@ function getMaterial(colorKey){
   const mat = new THREE.MeshStandardMaterial({
     map: tex, roughness: col.wood ? 0.7 : 0.55, metalness: 0, envMapIntensity: 0.6
   });
+  mat.__shared = true; if (mat.map) mat.map.__shared = true;
   matCache.set(colorKey, mat);
   return mat;
 }
+let _mirrorMat = null, _glassMat = null;
+// Общие материалы фурнитуры — создаются один раз, переиспользуются во всех мешах
+// (раньше создавались заново на каждый ящик/дверь при каждой пересборке → утечка GPU-памяти)
+const _sharedMats = {};
+function sharedMat(key, make){
+  if (!_sharedMats[key]){ const m = make(); m.__shared = true; _sharedMats[key] = m; }
+  return _sharedMats[key];
+}
+function matHandle(){ return sharedMat('handle', () => new THREE.MeshStandardMaterial({ color:0x2A2825, roughness:0.4, metalness:0.85 })); }
+function matRod(){ return sharedMat('rod', () => new THREE.MeshStandardMaterial({ color:0xC8C8CC, roughness:0.25, metalness:0.9 })); }
+function matBasket(){ return sharedMat('basket', () => new THREE.MeshStandardMaterial({ color:0x8A8A8A, roughness:0.4, metalness:0.7, transparent:true, opacity:0.55 })); }
+function matFrame(){ return sharedMat('frame', () => new THREE.MeshStandardMaterial({ color:0x2A2825, roughness:0.4, metalness:0.85 })); }
+function matInvisible(){ return sharedMat('invisible', () => new THREE.MeshBasicMaterial({ visible:false })); }
 function getMirrorMaterial(){
-  return new THREE.MeshPhysicalMaterial({ color:0xeef2f4, roughness:0.02, metalness:1, envMapIntensity:1.4 });
+  if (!_mirrorMat){ _mirrorMat = new THREE.MeshPhysicalMaterial({ color:0xeef2f4, roughness:0.02, metalness:1, envMapIntensity:1.4 }); _mirrorMat.__shared = true; }
+  return _mirrorMat;
 }
 function getGlassMaterial(){
-  return new THREE.MeshPhysicalMaterial({
+  if (!_glassMat) _glassMat = new THREE.MeshPhysicalMaterial({
     color:0x4a5560, transparent:true, opacity:0.4,
     roughness:0.05, metalness:0, transmission:0.7, thickness:0.5, envMapIntensity:1.2
   });
+  _glassMat.__shared = true;
+  return _glassMat;
 }
 
-function disposeNode(node){ node.traverse(o => { if (o.geometry) o.geometry.dispose(); }) }
+function disposeNode(node){
+  node.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    // Освобождаем материалы, КРОМЕ общих кэшированных (их переиспользуем)
+    const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    for (const m of mats){
+      if (!m || m.__shared) continue;
+      if (m.map && !m.map.__shared) m.map.dispose();
+      m.dispose();
+    }
+  });
+}
 
 // Добавляет тонкие тёмные линии-обводки на меш (как чертёжная окантовка) —
 // чтобы границы дверей/полок/перегородок были видны на любом цвете фасада.
@@ -2244,6 +2465,7 @@ function addEdges(mesh){
       color: 0x1A1614, transparent: true, opacity: 0.45,
       depthTest: true
     });
+    _edgesMat.__shared = true;
   }
   const edges = new THREE.EdgesGeometry(mesh.geometry, 15);
   const seg = new THREE.LineSegments(edges, _edgesMat);
@@ -2259,6 +2481,7 @@ function addFrontEdges(mesh, w, h, zOffset){
       color: 0x1A1614, transparent: true, opacity: 0.45,
       depthTest: true
     });
+    _edgesMat.__shared = true;
   }
   const planeGeo = new THREE.PlaneGeometry(w, h);
   const edges = new THREE.EdgesGeometry(planeGeo);
@@ -2296,9 +2519,9 @@ function drawCellFilling(filling, cellCx, cellCy, cellW, cellH, D, bodyMat, pare
   const T = 0.016;
   const cellInnerW = cellW - T * 0.5;
   const shelfThick = 0.016;
-  const rodMat = new THREE.MeshStandardMaterial({ color:0xC8C8CC, roughness:0.25, metalness:0.9 });
-  const handleMat = new THREE.MeshStandardMaterial({ color:0x2A2825, roughness:0.4, metalness:0.85 });
-  const basketMat = new THREE.MeshStandardMaterial({ color:0x8A8A8A, roughness:0.4, metalness:0.7, transparent:true, opacity:0.55 });
+  const rodMat = matRod();
+  const handleMat = matHandle();
+  const basketMat = matBasket();
 
   if (filling === 'empty') return;
 
@@ -2657,7 +2880,7 @@ function buildWardrobe(){
       const dWidth = cellW - doorGap * 2;
       const dHeight = cellH - doorGap * 2;
 
-      const hitZone = new THREE.Mesh(new THREE.PlaneGeometry(cellW * 0.92, cellH * 0.92), new THREE.MeshBasicMaterial({ visible:false }));
+      const hitZone = new THREE.Mesh(new THREE.PlaneGeometry(cellW * 0.92, cellH * 0.92), matInvisible());
       hitZone.position.set(cellCx, cellCy, facadeOffsetZ + 0.002);
       hitZone.userData.cellIndex = idx;
       hitZone.userData.cellCx = cellCx;
@@ -2714,7 +2937,7 @@ function buildWardrobe(){
 
         const handle = new THREE.Mesh(
           new THREE.BoxGeometry(drW * 0.4, 0.008, 0.012),
-          new THREE.MeshStandardMaterial({ color:0x2A2825, roughness:0.4, metalness:0.85 })
+          matHandle()
         );
         handle.position.set(drCx, drCy, facadeOffsetZ + 0.022);
         handle.userData.isDrawerHandle = true;
@@ -2778,7 +3001,7 @@ function buildWardrobe(){
 
             const handle = new THREE.Mesh(
               new THREE.BoxGeometry(fW * 0.4, 0.008, 0.012),
-              new THREE.MeshStandardMaterial({ color:0x2A2825, roughness:0.4, metalness:0.85 })
+              matHandle()
             );
             handle.position.set(fCx, fCy, facadeOffsetZ + 0.022);
             handle.userData.isDrawerHandle = true;
@@ -2849,7 +3072,7 @@ function buildWardrobe(){
 
       // Тонкая металлическая рамка для стеклянной двери
       if (cell.type === 'glass'){
-        const frameMat = new THREE.MeshStandardMaterial({ color:0x2A2825, roughness:0.4, metalness:0.85 });
+        const frameMat = matFrame();
         const frameThick = 0.018;
         const frameW = 0.012;
         const topFrame = new THREE.Mesh(new THREE.BoxGeometry(finalDoorW, frameW, frameThick+0.001), frameMat);
@@ -2970,7 +3193,7 @@ function buildWardrobe(){
       // Hit zone секции
       const wHitZone = new THREE.Mesh(
         new THREE.PlaneGeometry(wDoorWidth, wDoorH),
-        new THREE.MeshBasicMaterial({ visible:false })
+        matInvisible()
       );
       wHitZone.position.set(0, wDoorY, facadeZ + 0.02);
       wHitZone.userData.isWing = true;
@@ -3010,7 +3233,7 @@ function buildWardrobe(){
 
         const handle = new THREE.Mesh(
           new THREE.BoxGeometry(drW * 0.4, 0.008, 0.012),
-          new THREE.MeshStandardMaterial({ color:0x2A2825, roughness:0.4, metalness:0.85 })
+          matHandle()
         );
         handle.position.set(0, drCy, facadeZ + 0.013);
         handle.userData.isDrawerHandle = true;
@@ -3040,7 +3263,7 @@ function buildWardrobe(){
         wDoorGroup.add(wDoorMesh);
 
         if (wing.type === 'glass'){
-          const frameMat = new THREE.MeshStandardMaterial({ color:0x2A2825, roughness:0.4, metalness:0.85 });
+          const frameMat = matFrame();
           const fw = 0.012;
           const topF = new THREE.Mesh(new THREE.BoxGeometry(finalW, fw, 0.019), frameMat);
           topF.position.set(wDoorMesh.position.x, finalH/2 - fw/2, 0.001);
@@ -3103,20 +3326,8 @@ function buildWardrobe(){
   applyViewMode();
   dimsDirty = true;
 
-  // Outline только на ФАСАДЫ (двери/ящики/крыло) — это видимая «лицевая» графика.
-  // Внутренние полки/перегородки очерчены лёгкими edge-линиями (addEdges) — рендерить
-  // их все в outline-маску в 4-5 раз дороже без видимой пользы.
-  if (outlinePass){
-    const outlineTargets = [];
-    if (wardrobeRefs.covers){
-      for (const c of wardrobeRefs.covers){
-        if (c.userData.isDoorShadow) continue;
-        if (c.userData.isDrawerHandle) continue;
-        outlineTargets.push(c);
-      }
-    }
-    outlinePass.selectedObjects = outlineTargets;
-  }
+  // Outline только на ФАСАДЫ (двери/ящики/крыло) — видимая «лицевая» графика.
+  refreshOutlineTargets();
 }
 
 function autoFitCamera(W, H, D, shape){
@@ -3150,7 +3361,7 @@ function autoFitCamera(W, H, D, shape){
 }
 
 function addHandle(parent, doorW, doorH, opensLeft){
-  const handleMat = new THREE.MeshStandardMaterial({ color:0x2A2825, roughness:0.4, metalness:0.85 });
+  const handleMat = matHandle();
   const handleX = opensLeft ? doorW - 0.04 : -doorW + 0.04;
 
   if (state.defaultHandle === 'classic'){
@@ -3263,6 +3474,10 @@ let _interacting = false;            // идёт вращение/панорам
 let _dimsHiddenByInteraction = false;
 let _settleOutline = false;          // ждём затихания инерции, чтобы вернуть OutlinePass
 let _lastControlsChange = 0;
+// Сброс/возврат разрешения — те же closures, что у вращения (назначаются в initThree).
+// Зум колесом тоже их использует, чтобы во время приближения отключался OutlinePass.
+let _dropResolutionFn = null, _restoreResolutionFn = null;
+let _wheelZoomActive = false;        // идёт зум колесом — в конце вернуть чёткость/контуры
 function requestRender(){ needsRender = true; }
 
 function animate(){
@@ -3302,6 +3517,11 @@ function animate(){
     const diff = targetCameraDist - currentDist;
     if (Math.abs(diff) < 0.003){
       targetCameraDist = null;
+      // Зум доехал до цели — возвращаем полное разрешение и контуры
+      if (_wheelZoomActive){
+        _wheelZoomActive = false;
+        if (_restoreResolutionFn) _restoreResolutionFn();
+      }
     } else {
       const newDist = currentDist + diff * 0.12;
       const dir = _zoomDir.subVectors(camera.position, controls.target).normalize();
@@ -3378,6 +3598,11 @@ const _zoomDir = new THREE.Vector3();
 function onWheel(e){
   e.preventDefault();
   needsRender = true;
+  // Зум — это тоже движение камеры: уходим в лёгкий режим (DPR→1, без OutlinePass),
+  // иначе при каждом шаге приближения гонится тяжёлый постпроцессинг и зум «дёргается».
+  if (_dropResolutionFn) _dropResolutionFn();
+  _wheelZoomActive = true;
+  _lastControlsChange = performance.now();
   const now = performance.now();
   // ограничиваем — не больше одного "шага накопления" за 16мс (Mac trackpad шлёт 30+ событий за свайп)
   if (now - lastWheelAt < 16) {
@@ -3942,7 +4167,7 @@ let _viewBeforeEdit = null;
 
 function openCellEditor(idx){
   const wasEditing = isEditingCell();
-  // При первом входе в редактирование — запомнить вид и переключить в xray для видимости наполнения
+  // При входе в редактирование — переключаем в xray для видимости наполнения
   if (!wasEditing && state.view !== 'xray'){
     _viewBeforeEdit = state.view;
     state.view = 'xray';
@@ -3951,22 +4176,32 @@ function openCellEditor(idx){
   state.editingCell = idx;
   state.hasUsedCellEdit = true;
   updateCellHighlight();
-  dimsDirty = true; // размеры колонны перерисовать сразу (показываются даже при выключенном тоггле)
-  // Скрыть hover-popover (cell-edit body теперь показывает информацию)
+  dimsDirty = true;
   const pop = document.getElementById('cell-info-popover');
   if (pop) pop.classList.remove('show');
+  showCellModal();   // компактный модал настройки (как у конкурента)
   renderUI();
 }
 
+function showCellModal(){
+  const overlay = document.getElementById('cell-modal-overlay');
+  if (!overlay) return;
+  overlay.classList.add('show');
+  renderCellModal();
+}
+
+function closeCellModal(){
+  const overlay = document.getElementById('cell-modal-overlay');
+  if (overlay) overlay.classList.remove('show');
+  closeCellEditor();
+}
+
 function closeCellEditor(){
-  // На шаге 2 редактор является основным содержанием — не закрываем его, переключаемся на шаг 1
-  if (state.step === 2){
-    gotoStep(1);
-    return;
-  }
+  // Закрываем модал настройки и снимаем выделение колонны.
+  const overlay = document.getElementById('cell-modal-overlay');
+  if (overlay) overlay.classList.remove('show');
   state.editingCell = -1;
-  dimsDirty = true; // вернуть скрытие размеров, если переключатель выключен
-  // Восстановить вид если был временно изменён
+  dimsDirty = true;
   if (_viewBeforeEdit !== null){
     state.view = _viewBeforeEdit;
     _viewBeforeEdit = null;
@@ -4439,53 +4674,19 @@ function renderUI(){
   const headClose = document.getElementById('head-close');
   const stepsBar = document.getElementById('steps-bar');
 
-  const inCellEdit = isWingId(state.editingCell) || (typeof state.editingCell === 'number' && state.editingCell >= 0);
-  const isWing = isWingId(state.editingCell);
-  const isStep2NormalMode = state.step === 2 && inCellEdit;
-  const isModalCellEdit = inCellEdit && !isStep2NormalMode;
+  // Редактор ячейки теперь в отдельном модале — панель всегда показывает шаги.
+  // Если открыт модал, синхронизируем его содержимое.
+  if (isEditingCell()){
+    const overlay = document.getElementById('cell-modal-overlay');
+    if (overlay && overlay.classList.contains('show')) renderCellModal();
+  }
 
-  if (isModalCellEdit){
-    // Модальный режим — cell-edit вызван кликом 3D с другого шага
-    if (isWing){
-      const wr = wingRowOf(state.editingCell);
-      const secNo = state.wingRows - wr;
-      const wingDepth = state.depth - 32;
-      const wSecHmm = Math.round((state.height - state.socket - (state.antresol ? state.antresolH : 0) - 32) / (state.wingRows || 1));
-      document.getElementById('step-num').textContent = state.wingRows > 1 ? `Крыло · секция ${secNo}` : `Угловое крыло`;
-      document.getElementById('step-title').innerHTML = state.wingRows > 1 ? `Крыло · секция <em>${secNo}</em>` : `Угловое <em>крыло</em>`;
-      document.getElementById('step-desc').innerHTML = `<span class="cell-size-line">${wingDepth}×${wSecHmm} мм фронт · ${state.wingLength} мм вглубь</span>`;
-    } else {
-      const idx = state.editingCell;
-      const c = idx % state.cols;
-      document.getElementById('step-num').textContent = `Колонна ${c+1}`;
-      const cellWmm = Math.round((state.width - 32) / state.cols);
-      const gridHmm = state.height - state.socket - (state.antresol ? state.antresolH : 0) - 32;
-      document.getElementById('step-title').innerHTML = `Колонна <em>${c+1}</em>`;
-      document.getElementById('step-desc').innerHTML = `<span class="cell-size-line">${cellWmm} × ${gridHmm} мм · ${state.rows} ${state.rows === 1 ? 'секция' : state.rows < 5 ? 'секции' : 'секций'}</span>`;
-    }
-    headClose.classList.remove('hidden');
-    stepsBar.style.opacity = '0.4';
-    stepsBar.style.pointerEvents = 'none';
-    renderCellEditBody();
-  } else {
+  {
     const step = state.step;
     const meta = STEPS[step];
     document.getElementById('step-num').textContent = `Шаг ${step} из 4`;
-    if (isStep2NormalMode){
-      document.getElementById('step-title').innerHTML = meta.em ? `${meta.title} <em>${meta.em}</em>` : meta.title;
-      if (isWing){
-        document.getElementById('step-desc').innerHTML = `<strong>Угловое крыло</strong> — ${state.wingLength} мм вглубь. <span style="color:var(--text-3)">Кликните колонну чтобы переключиться.</span>`;
-      } else {
-        const idx = state.editingCell;
-        const c = idx % state.cols;
-        const cellWmm = Math.round((state.width - 32) / state.cols);
-        const gridHmm = state.height - state.socket - (state.antresol ? state.antresolH : 0) - 32;
-        document.getElementById('step-desc').innerHTML = `<strong>Колонна ${c+1}</strong> — ${cellWmm}×${gridHmm} мм. <span style="color:var(--text-3)">Кликните другую колонну в 3D или мини-карте.</span>`;
-      }
-    } else {
-      document.getElementById('step-title').innerHTML = meta.em ? `${meta.title} <em>${meta.em}</em>` : meta.title;
-      document.getElementById('step-desc').textContent = meta.desc;
-    }
+    document.getElementById('step-title').innerHTML = meta.em ? `${meta.title} <em>${meta.em}</em>` : meta.title;
+    document.getElementById('step-desc').textContent = meta.desc;
     headClose.classList.add('hidden');
     stepsBar.style.opacity = '';
     stepsBar.style.pointerEvents = '';
@@ -4502,11 +4703,7 @@ function renderUI(){
       ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg> Отправить заявку`
       : `Дальше <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg>`;
 
-    if (isStep2NormalMode){
-      renderCellEditBody();
-    } else {
-      renderStepBody();
-    }
+    renderStepBody();
   }
 
   const price = calcPrice();
@@ -4531,6 +4728,223 @@ function renderUI(){
   }
 
   saveStateToStorage();
+}
+
+function renderCellModal(){
+  const editId = state.editingCell;
+  const isWing = isWingId(editId);
+  if (editId === -1 || editId === undefined) return;
+  const cell = isWing ? wingCellOf(editId) : state.cells[editId];
+  if (!cell) return;
+  const body = document.getElementById('cell-modal-body');
+  const titleEl = document.getElementById('cell-modal-title');
+  if (!body) return;
+
+  // Размеры ячейки
+  const gridHmm = state.height - state.socket - (state.antresol ? state.antresolH : 0) - 32;
+  const cellWmm = isWing ? (state.depth - 32) : Math.round((state.width - 32) / state.cols);
+  const cellHmm = isWing ? Math.round(gridHmm / (state.wingRows || 1)) : Math.round(gridHmm / state.rows);
+
+  // Заголовок
+  if (titleEl){
+    if (isWing){
+      const secNo = state.wingRows - wingRowOf(editId);
+      titleEl.textContent = state.wingRows > 1 ? `Крыло · секция ${secNo}` : 'Угловое крыло';
+    } else {
+      const c = editId % state.cols;
+      const r = Math.floor(editId / state.cols);
+      titleEl.textContent = state.rows > 1 ? `Ячейка ${c+1}.${r+1}` : `Колонна ${c+1}`;
+    }
+  }
+
+  const isCustom = cell.filling === 'custom';
+  let html = '';
+
+  // 1. Тип ячейки — ряд иконок
+  html += `<div class="cm-type-row">
+    ${Object.entries(CELL_TYPES).map(([k,v]) => `
+      <div class="cm-type ${cell.type===k?'on':''}" data-cell-type="${k}" title="${v.name}">
+        ${ICONS[k]}
+        <span class="cm-type-label">${v.name}</span>
+      </div>`).join('')}
+  </div>`;
+
+  // 2. Наполнение — выпадающий список (для всех кроме ящика)
+  if (cell.type !== 'drawer'){
+    const opts = fillingOptionsForUI();
+    html += `<div>
+      <select class="cm-select" data-cell-filling-select>
+        ${isCustom ? '<option value="custom" selected>Своя комбинация зон</option>' : ''}
+        ${opts.map(([k,v]) => `<option value="${k}" ${(!isCustom && (cell.filling||'empty')===k)?'selected':''}>${v.name}${v.sub?' — '+v.sub:''}</option>`).join('')}
+        <option value="__custom__" ${isCustom?'':''}>＋ Своя комбинация зон…</option>
+      </select>
+    </div>`;
+
+    // Конструктор зон, если выбрана своя комбинация
+    if (isCustom){
+      const cellHmm_ce = cellHmm;
+      const fillOptions = [
+        { k:'drawer_box', name:'Ящик (наружный фасад)' },
+        ...fillingOptionsForUI().filter(([k]) => k !== 'custom').map(([k, v]) => ({ k, name: v.name }))
+      ];
+      const stack = cell.stack || [];
+      const zonesPreview = computeStackZones(stack, cellHmm_ce);
+      let rowsHtml = '';
+      for (let i = stack.length - 1; i >= 0; i--){
+        const z = stack[i];
+        const zv = zonesPreview[i];
+        const factH = zv ? (zv.topMm - zv.bottomMm) : 0;
+        const isAuto = !z.h;
+        rowsHtml += `
+          <div class="stack-zone" data-zone-i="${i}">
+            <select class="stack-zone-f" data-zone-f="${i}">
+              ${fillOptions.map(o => `<option value="${o.k}" ${o.k===z.f?'selected':''}>${o.name}</option>`).join('')}
+            </select>
+            <div class="stack-zone-h">
+              <input type="number" data-zone-h="${i}" min="0" max="2500" step="50"
+                value="${z.h || ''}" placeholder="авто" ${isAuto?'class="auto"':''}>
+              <span class="stack-zone-fact">${isAuto ? '≈'+factH : factH} мм</span>
+            </div>
+            <button class="stack-zone-del" data-zone-del="${i}" title="Удалить зону">✕</button>
+          </div>`;
+      }
+      html += `
+        <div class="stack-builder">
+          <div class="stack-builder-head">
+            <span>Зоны · сверху вниз</span>
+            <span class="stack-builder-total">всего ${cellHmm_ce} мм</span>
+          </div>
+          <button class="bulk-btn" id="stack-add-zone" style="width:100%; margin-bottom:6px">+ Добавить зону сверху</button>
+          ${rowsHtml}
+          <div class="stack-builder-hint">Пусто = «авто» (зона делит остаток). Нижняя зона — последняя.</div>
+        </div>`;
+    }
+  }
+
+  // 3. Сторона петель (для дверей/зеркал/стекла)
+  if (['door','mirror','glass'].includes(cell.type)){
+    html += `<div>
+      <div class="cm-field-label">Сторона петель</div>
+      <div class="popover-side">
+        <div class="ps ${cell.side==='left'?'on':''}" data-cell-side="left">Слева</div>
+        <div class="ps ${cell.side==='right'?'on':''}" data-cell-side="right">Справа</div>
+      </div>
+    </div>`;
+  }
+
+  // 4. Цвет (для дверей/ящиков)
+  if (cell.type === 'door' || cell.type === 'drawer'){
+    html += `<div>
+      <div class="cm-field-label">Цвет фасада</div>
+      <div class="swatch-grid">
+        <div class="swatch ${!cell.color?'on':''}" data-cell-color="" style="background:linear-gradient(135deg, var(--surface-2) 50%, var(--line) 50%)" title="Как корпус"></div>
+        ${visibleColorEntries().map(([k,v]) => `
+          <div class="swatch ${cell.color===k?'on':''}" data-cell-color="${k}" style="background:${v.hex}" title="${v.name}"></div>
+        `).join('')}
+      </div>
+    </div>`;
+  }
+
+  // 5. Размер ячейки (показываем; ширина/высота заданы сеткой — редактируются на шаге 1)
+  html += `<div>
+    <div class="cm-field-label">Размер ячейки</div>
+    <div class="cm-size-row">
+      <div class="cm-size-field">
+        <input class="cm-size-input" type="number" value="${cellWmm}" disabled title="Ширина задаётся числом колонн на шаге «Основа»">
+      </div>
+      <span class="cm-size-x">×</span>
+      <div class="cm-size-field">
+        <input class="cm-size-input" type="number" value="${cellHmm}" disabled title="Высота задаётся числом секций">
+      </div>
+    </div>
+    <div class="cm-size-hint">Размер меняется числом колонн и секций на шаге «Основа»</div>
+  </div>`;
+
+  // 6. Кнопка Готово
+  html += `<button class="cm-save" id="cm-save">Готово</button>`;
+
+  body.innerHTML = html;
+  attachCellModalHandlers();
+}
+
+function attachCellModalHandlers(){
+  const editId = state.editingCell;
+  const isWing = isWingId(editId);
+  const target = () => isWing ? wingCellOf(editId) : state.cells[editId];
+
+  // Типы
+  document.querySelectorAll('#cell-modal-body [data-cell-type]').forEach(el => {
+    el.addEventListener('click', () => { target().type = el.dataset.cellType; scheduleBuild(); renderCellModal(); renderUI(); });
+  });
+  // Наполнение (выпадающий список)
+  const fillSel = document.querySelector('#cell-modal-body [data-cell-filling-select]');
+  if (fillSel){
+    fillSel.addEventListener('change', () => {
+      const v = fillSel.value;
+      const t = target();
+      if (v === '__custom__'){
+        // включить конструктор зон с разумным дефолтом
+        t.filling = 'custom';
+        if (!Array.isArray(t.stack) || !t.stack.length){
+          t.stack = [{ f:'shelves', h:0 }];
+        }
+      } else {
+        t.filling = v;
+        delete t.stack;
+      }
+      scheduleBuild(); renderCellModal(); renderUI();
+    });
+  }
+  // Сторона
+  document.querySelectorAll('#cell-modal-body [data-cell-side]').forEach(el => {
+    el.addEventListener('click', () => { target().side = el.dataset.cellSide; scheduleBuild(); renderCellModal(); renderUI(); });
+  });
+  // Цвет
+  document.querySelectorAll('#cell-modal-body [data-cell-color]').forEach(el => {
+    el.addEventListener('click', () => { target().color = el.dataset.cellColor || null; scheduleBuild(); renderCellModal(); renderUI(); });
+  });
+  // Конструктор зон
+  const addZone = document.getElementById('stack-add-zone');
+  if (addZone){
+    addZone.addEventListener('click', () => {
+      const t = target();
+      if (!Array.isArray(t.stack)) t.stack = [];
+      t.stack.push({ f:'shelves', h:0 });
+      scheduleBuild(); renderCellModal(); renderUI();
+    });
+  }
+  document.querySelectorAll('#cell-modal-body [data-zone-f]').forEach(el => {
+    el.addEventListener('change', () => {
+      const t = target(); const i = parseInt(el.dataset.zoneF);
+      if (t.stack && t.stack[i]){
+        t.stack[i].f = el.value;
+        if (el.value === 'drawer_box' && !t.stack[i].h) t.stack[i].h = 250;
+        scheduleBuild(); renderCellModal(); renderUI();
+      }
+    });
+  });
+  document.querySelectorAll('#cell-modal-body [data-zone-h]').forEach(el => {
+    el.addEventListener('change', () => {
+      const t = target(); const i = parseInt(el.dataset.zoneH);
+      if (t.stack && t.stack[i]){
+        t.stack[i].h = Math.max(0, Math.min(2500, parseInt(el.value) || 0));
+        scheduleBuild(); renderCellModal(); renderUI();
+      }
+    });
+  });
+  document.querySelectorAll('#cell-modal-body [data-zone-del]').forEach(el => {
+    el.addEventListener('click', () => {
+      const t = target(); const i = parseInt(el.dataset.zoneDel);
+      if (t.stack){
+        t.stack.splice(i, 1);
+        if (t.stack.length === 0){ t.filling = 'empty'; delete t.stack; }
+        scheduleBuild(); renderCellModal(); renderUI();
+      }
+    });
+  });
+  // Готово
+  const saveBtn = document.getElementById('cm-save');
+  if (saveBtn) saveBtn.addEventListener('click', () => closeCellModal());
 }
 
 function renderCellEditBody(){
@@ -5316,7 +5730,7 @@ function submitOrder(){
   const hasWing = SHAPES[state.shape].hasWing;
   const payload = {
     timestamp: new Date().toISOString(),
-    source: 'wardrobe-configurator-v62',
+    source: 'wardrobe-configurator-v65',
     customer: state.customer,
     config: {
       shape: SHAPES[state.shape].name + (hasWing ? ' (' + SHAPES[state.shape].sub + ')' : ''),
@@ -5416,17 +5830,19 @@ function isEditingCell(){
 }
 
 function gotoStep(newStep){
+  // Закрываем модал ячейки при любой смене шага
+  const overlay = document.getElementById('cell-modal-overlay');
+  if (overlay) overlay.classList.remove('show');
+  state.editingCell = -1;
+
   if (newStep === 2){
-    if (!isEditingCell()) state.editingCell = 0;
-    // Авто-xray на шаге 2 — видеть наполнение во время настройки
+    // На шаге 2 — режим «Внутри», менеджер кликает по колонне → открывается модал
     if (state.view !== 'xray'){
       _viewBeforeEdit = state.view;
       state.view = 'xray';
       applyViewMode();
     }
   } else {
-    if (isEditingCell()) state.editingCell = -1;
-    // Восстановить вид при выходе из шага 2 (если был сохранён)
     if (_viewBeforeEdit !== null){
       state.view = _viewBeforeEdit;
       _viewBeforeEdit = null;
@@ -5439,7 +5855,6 @@ function gotoStep(newStep){
 }
 
 document.getElementById('btn-next').addEventListener('click', () => {
-  if (isEditingCell() && state.step !== 2){ closeCellEditor(); return; }
   if (state.step < 4){ gotoStep(state.step + 1); }
   else {
     if (!state.customer.name || state.customer.name.trim().length < 2){
@@ -5458,10 +5873,14 @@ document.getElementById('btn-next').addEventListener('click', () => {
   }
 });
 document.getElementById('btn-prev').addEventListener('click', () => {
-  if (isEditingCell() && state.step !== 2){ closeCellEditor(); return; }
   if (state.step > 1){ gotoStep(state.step - 1); }
 });
 document.getElementById('head-close').addEventListener('click', closeCellEditor);
+// Модал настройки ячейки — крестик и клик по фону
+const _cmClose = document.getElementById('cell-modal-close');
+if (_cmClose) _cmClose.addEventListener('click', closeCellModal);
+const _cmOverlay = document.getElementById('cell-modal-overlay');
+if (_cmOverlay) _cmOverlay.addEventListener('click', e => { if (e.target === _cmOverlay) closeCellModal(); });
 document.getElementById('head-reset').addEventListener('click', () => {
   if (confirm('Сбросить все настройки и начать заново?')) resetState();
 });
@@ -5505,7 +5924,7 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 document.getElementById('btn-zoom-in').addEventListener('click', () => zoomBy(0.88));
 document.getElementById('btn-zoom-out').addEventListener('click', () => zoomBy(1.14));
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape'){ if (isEditingCell()) closeCellEditor(); }
+  if (e.key === 'Escape'){ if (isEditingCell()) closeCellModal(); }
   const inInput = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
   if (inInput) return;
   if (isEditingCell()) return;
